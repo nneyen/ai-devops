@@ -29,8 +29,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: failure-logs
-          path: output.log
-
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -39,7 +37,6 @@ jobs:
         run: |
           pip install openai requests slack-sdk
       - name: AI Investigation
-        if: failure()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
