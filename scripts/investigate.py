@@ -88,9 +88,9 @@ def investigate_logs(log_file_path):
 
     def send_to_slack(message):
         # Send Report to Slack
-        slack_webhook_url = os.getenv("SLACK_WEBHOOK_URL")
+        slack_webhook_url = os.getenv("SLACK_WEBHOOK")
         if not slack_webhook_url:
-            raise ValueError("SLACK_WEBHOOK_URL environment variable is not set")
+            raise ValueError("SLACK_WEBHOOK environment variable is not set")
         payload = {
             "text": f"🚨 *CI/CD Failure Analysis* 🚨\n{message}"
         }
