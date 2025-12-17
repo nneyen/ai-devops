@@ -78,7 +78,7 @@ def investigate_logs(log_file_path):
     If required information is missing, explicitly state what is missing.
     """
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-5-nano",
         messages=[
             {"role": "system", "content": "You are a senior DevOps engineer assisting with CI/CD incident triage."},
             {"role": "user", "content": prompt}
