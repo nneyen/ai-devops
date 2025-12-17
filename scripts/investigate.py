@@ -5,15 +5,6 @@ import requests
 from openai import OpenAI
 from slack_sdk import WebClient
 
-
-# Metadata for GitHub Environment
-def get_github_metadata():
-    return {
-        "workflow_name": os.getenv("GITHUB_WORKFLOW"),
-        "job_name": os.getenv("GITHUB_JOB"),
-        "repository": os.getenv("GITHUB_REPOSITORY"),
-        "run_id": os.getenv("GITHUB_RUN_ID")
-    }
 def investigate_logs(log_file_path):
     # READ LOGS FROM FILE
     if not os.path.exists(log_file_path):
@@ -22,7 +13,13 @@ def investigate_logs(log_file_path):
         logs = file.readlines()
         tail_logs = "".join(logs[-100:])
 
-    #2 ASK AI TO INVESTIGATE
+    # Metadata for GitHub Environment
+    workflow_name = os.getenv("GITHUB_WORKFLOW_NAME")
+    job_name = os.getenv("GITHUB_JOB_NAME")
+    repository = os.getenv("GITHUB_REPOSITORY")
+    run_id = os.getenv("GITHUB_RUN_ID")
+    
+    # ASK AI TO INVESTIGATE
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     system_prompt = """
     You are a senior DevOps engineer performing automated CI/CD failure triage for GitHub Actions workflows.
@@ -45,9 +42,9 @@ def investigate_logs(log_file_path):
     - Prefer accuracy and clarity over completeness.
 
     Metadata:
-    - Workflow: {metadata["workflow_name"]}
-    - Job: {metadata["job_name"]}
-    - Run URL: https://github.com/{metadata["repository"]}/actions/runs/{metadata["run_id"]}
+    - Workflow: {workflow_name}
+    - Job: {job_name}
+    - Run URL: https://github.com/{repository}/actions/runs/{run_id}
     Tasks:
 
     1. Identify the earliest failure:
@@ -93,7 +90,6 @@ def investigate_logs(log_file_path):
     - Job: {job_name}
     - Step: {step_name}
     - Command / Action: {run_command}
-    - File / Path / Container / Pod: {file_path}
 
     *Root Cause Assessment:*
     <concise explanation>
@@ -113,9 +109,10 @@ def investigate_logs(log_file_path):
     response = client.chat.completions.create(
         model="gpt-5-nano",
         messages=[
-            {"role": "system", "content": "You are a senior DevOps engineer assisting with CI/CD incident triage."},
-            {"role": "user", "content": prompt}
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
         ]
+        temperature=0.1
     )
     return response.choices[0].message.content
 
@@ -131,7 +128,6 @@ def send_to_slack(message):
 
 
 if __name__ == "__main__":
-    metadata = get_github_metadata()
     log_file_path = sys.argv[1]
     report = investigate_logs(log_file_path)
     send_to_slack(report)
