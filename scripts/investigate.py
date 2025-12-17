@@ -1,5 +1,12 @@
-import os sys json requests 
+import os 
+import sys 
+import json 
+import requests 
 from openai import OpenAI
+from slack_sdk import WebClient
+
+
+slack_webhook_url = os.getenv("SLACK_WEBHOOK")
 
 def investigate_logs(log_file_path):
     # READ LOGS FROM FILE
@@ -7,96 +14,175 @@ def investigate_logs(log_file_path):
         return "File does not exist"
     with open(log_file_path, 'r') as file:
         logs = file.readlines()
-        tail_logs = "".join(logs[-100:])
 
-    #2 ASK AI TO INVESTIGATE
+        if len(logs) > 2000:
+            head = "".join(logs[:200])
+            tail = "".join(logs[-1800:])
+            tail_logs = f"{head}\n\n... [TRUNCATED {len(logs)-2000} LINES ] ...\n\n{tail}"
+        else:
+            tail_logs = "".join(logs)
+
+
+    # Metadata for GitHub Environment
+    workflow_name = os.getenv("GITHUB_WORKFLOW_NAME")
+    job_name = os.getenv("GITHUB_JOB_NAME")
+    repository = os.getenv("GITHUB_REPOSITORY")
+    run_id = os.getenv("GITHUB_RUN_ID")
+    
+    # ASK AI TO INVESTIGATE
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    prompt = f"""
-    You are a senior DevOps engineer assisting with CI/CD incident triage.
+    system_prompt = """
+    You are a senior DevOps engineer performing automated CI/CD failure triage for GitHub Actions workflows.
+    You will be given GitHub Actions job logs (possibly truncated) and workflow metadata.
+    Your objective is to minimize investigation time for the on-call engineer.
+    
+    Strict rules:
+    - Identify the earliest *actionable* failure in execution order.
+    - Ignore secondary, cascading, or cleanup errors.
+    - Do NOT speculate beyond what is present in the logs.
+    - If the logs do not contain a concrete root error, state this explicitly.
+    - Prefer accuracy and clarity over completeness.
+    """
+    user_prompt = f"""
+    Strict rules:
+    - Identify the earliest *actionable* failure in execution order.
+    - Ignore secondary, cascading, or cleanup errors.
+    - Do NOT speculate beyond what is present in the logs.
+    - If the logs do not contain a concrete root error, state this explicitly.
+    - Prefer accuracy and clarity over completeness.
 
-    Given the following CI job logs, perform a failure analysis with the goal of minimizing investigation time for the on-call engineer.
+    Metadata:
+    - Workflow: {workflow_name}
+    - Job: {job_name}
+    - Run URL: https://github.com/{repository}/actions/runs/{run_id}
 
-    Your tasks:
+    --- BEGINNING OF LOGS ---
+    {tail_logs}
+    --- END OF LOGS ---
+    
+    Tasks:
 
-    1. Identify the earliest real failure in the logs.
-    - Ignore secondary or cascading errors that occur after the initial failure.
-    - If multiple errors appear, select the one that first caused the job to fail.
+    1. Identify the earliest failure:
+    - Quote the exact log line(s) that indicate the failure.
+    - If only generic messages are present (e.g., "Process completed with exit code 1"), state that no actionable root error is visible.
 
-    2. Precisely locate where the failure occurred.
-    - Include:
-        - CI job name or step (if inferable)
-        - Command or script being executed
-        - File path, line number, container, or pod name (if present)
-    - If location is ambiguous, explain why.
+    2. Localize where the failure occurred:
+    - Workflow name
+    - Job name
+    - Step name (or action name)
+    - `run:` command or action being executed
+    - File path, line number, container, or Kubernetes pod (if present)
+    - If localization is incomplete, explicitly state why.
 
-    3. Categorize the failure into exactly one of the following:
-    - infra
-    - dependency
-    - auth
-    - config
-   - test
-   - timeout
+    3. Classify the failure into exactly ONE category:
+    infra | dependency | auth | config | test | timeout
 
-    4. Summarize the likely root cause in 1–2 concise sentences.
-    - Focus on the underlying issue, not the symptom.
+    4. Assign a confidence level:
+    - High: clear root error and precise location
+    - Medium: strong signal but missing some context
+    - Low: generic failure or insufficient logs
 
-    5. Provide 2–4 concrete next verification or remediation steps.
-    - Steps must be actionable (specific commands, config checks, or logs to inspect).
-    - Prioritize steps that confirm or rule out the root cause quickly.
+    5. Summarize the likely root cause in 1–2 sentences.
+    - If confidence is Low, describe the most probable failure class without guessing specifics.
 
-    6. Format the final output exactly as a Slack-ready incident notification.
+    6. Provide 2–4 fast verification or remediation steps:
+    - Steps must be concrete and immediately actionable.
+    - Prefer validation commands or checks over permanent fixes.
+    - Avoid generic advice.
 
-    Slack message format:
-
+    Output format (Slack-ready, exact):
     ---
-    🚨 *CI Pipeline Failure Detected*
-
     *Failure Category:* <category>
+    *Confidence:* <High | Medium | Low>
 
     *Earliest Failure:*
-    <short error message>
+    <quoted error or explicit statement that no actionable error is present>
 
     *Location:*
-    - Job/Step: <job or step name>
-    - Command: <command if available>
-    - File/Path/Pod: <file path, container, or pod name if available>
+    - Repository: {repository}
+    - Workflow: {workflow_name}
+    - Job: {job_name}
 
-    *Likely Root Cause:*
+    *Root Cause Assessment:*
     <concise explanation>
 
     *Recommended Next Steps:*
-    1. <step one>
-    2. <step two>
-    3. <step three (if applicable)>
+    1. <step>
+    2. <step>
+    3. <step>
     ---
 
-    Logs:
-    {tail_logs}
+    Do NOT include raw logs.
+    Do NOT add commentary outside this format.
 
-    Do not include raw logs.
-    Do not speculate beyond the evidence in the logs.
-    If required information is missing, explicitly state what is missing.
     """
     response = client.chat.completions.create(
-        model="gpt-5-nano",
+        model="gpt-4o",
         messages=[
-            {"role": "system", "content": "You are a senior DevOps engineer assisting with CI/CD incident triage."},
-            {"role": "user", "content": prompt}
-        ]
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        temperature=0.1, #make AI a boring reporter of facts :)
+        max_tokens=800
     )
     return response.choices[0].message.content
 
-    def send_to_slack(message):
-        # Send Report to Slack
-        slack_webhook_url = os.getenv("SLACK_WEBHOOK")
-        if not slack_webhook_url:
-            raise ValueError("SLACK_WEBHOOK environment variable is not set")
-        payload = {
-            "text": f"🚨 *CI/CD Failure Analysis* 🚨\n{message}"
+def send_to_slack(slack_webhook_url, message, run_url):
+    # Send Report to Slack
+    if not slack_webhook_url:
+        raise ValueError("SLACK_WEBHOOK environment variable is not set")
+
+    blocks = [
+        {
+            "type": "header",
+            "text": {
+                "type": "plain_text",
+                "text": "🚨 *CI/CD Failure Analysis* 🚨",
+                "emoji": True
+            }, 
+        },
+        {
+            "type": "divider"
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"{message}"
+            }
+        },
+        {
+            "type": "actions",
+            "elements": [
+                {
+                    "type": "button",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "View Failed Run",
+                        "emoji": True
+                    },
+                    "url": run_url,
+                    "style": "danger"
+                }
+            ]
         }
-        requests.post(slack_webhook_url, json=payload)
+    ]
+    payload = {"blocks": blocks}
+    response = requests.post(slack_webhook_url, json=payload)
+    if response.status_code != 200:
+        raise Exception("Failed to send Slack notification")
+    print("Slack notification sent successfully")
+
 if __name__ == "__main__":
     log_file_path = sys.argv[1]
     report = investigate_logs(log_file_path)
-    send_to_slack(report)
+
+    webhook_url = os.getenv("SLACK_WEBHOOK")
+    repo = os.getenv("GITHUB_REPOSITORY", "Unknown/Repo")
+    run_id = os.getenv("GITHUB_RUN_ID", "0")
+    
+    # Construct the Run URL for the Slack button
+    run_url = f"https://github.com/{repo}/actions/runs/{run_id}"
+
+    send_to_slack(webhook_url, report, run_url)
     print("Analysis completed. Report sent to Slack.")

@@ -1,0 +1,48 @@
+name: AI Pipeline Helper
+
+on: [push]
+
+jobs:
+  run-app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run App
+        run: |
+          set -o pipefail
+          node app.js 2>&1 | tee output.log
+
+      - name: Upload Logs on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-logs
+          path: output.log
+  investigate:
+    needs: [run-app]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download Logs
+        uses: actions/download-artifact@v4
+        with:
+          name: failure-logs
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          pip install openai requests slack-sdk
+      - name: AI Investigation
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_JOB_NAME: ${{ github.job }}
+          GITHUB_WORKFLOW_NAME: ${{ github.workflow }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        run: python scripts/investigate.py output.log
