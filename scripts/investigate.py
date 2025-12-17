@@ -148,7 +148,7 @@ def send_to_slack(slack_webhook_url, message, run_url):
                     "type": "button",
                     "text": {
                         "type": "plain_text",
-                        "text": "View Failed Run"
+                        "text": "View Failed Run",
                         "emoji": True
                     },
                     "url": run_url,
