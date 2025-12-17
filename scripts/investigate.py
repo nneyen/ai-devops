@@ -1,5 +1,6 @@
 import os sys json requests 
 from openai import OpenAI
+from slack_sdk import WebClient
 
 def investigate_logs(log_file_path):
     # READ LOGS FROM FILE
