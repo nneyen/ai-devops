@@ -9,7 +9,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run App
-        run: node app.js 2>&1 | tee output.log
+        run: |
+          set -e -o pipefail
+          node app.js 2>&1 | tee output.log
 
       - name: Upload Logs on Failure
         if: always()
