@@ -169,7 +169,7 @@ def send_to_slack(slack_webhook_url, message, run_url):
                     "text": f"📍 *Repo:* {repository}  |  🆔 *Run ID:* {os.getenv('GITHUB_RUN_ID')}"
                 }
             ]
-        }
+        },
         {
             "type": "actions",
             "elements": [
