@@ -5,6 +5,15 @@ import requests
 from openai import OpenAI
 from slack_sdk import WebClient
 
+
+# Metadata for GitHub Environment
+def get_github_metadata():
+    return {
+        "workflow_name": os.getenv("GITHUB_WORKFLOW"),
+        "job_name": os.getenv("GITHUB_JOB"),
+        "repository": os.getenv("GITHUB_REPOSITORY"),
+        "run_id": os.getenv("GITHUB_RUN_ID")
+    }
 def investigate_logs(log_file_path):
     # READ LOGS FROM FILE
     if not os.path.exists(log_file_path):
@@ -15,71 +24,91 @@ def investigate_logs(log_file_path):
 
     #2 ASK AI TO INVESTIGATE
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    prompt = f"""
-    You are a senior DevOps engineer assisting with CI/CD incident triage.
+    system_prompt = """
+    You are a senior DevOps engineer performing automated CI/CD failure triage for GitHub Actions workflows.
+    You will be given GitHub Actions job logs (possibly truncated) and workflow metadata.
+    Your objective is to minimize investigation time for the on-call engineer.
+    
+    Strict rules:
+    - Identify the earliest *actionable* failure in execution order.
+    - Ignore secondary, cascading, or cleanup errors.
+    - Do NOT speculate beyond what is present in the logs.
+    - If the logs do not contain a concrete root error, state this explicitly.
+    - Prefer accuracy and clarity over completeness.
+    """
+    user_prompt = f"""
+    Strict rules:
+    - Identify the earliest *actionable* failure in execution order.
+    - Ignore secondary, cascading, or cleanup errors.
+    - Do NOT speculate beyond what is present in the logs.
+    - If the logs do not contain a concrete root error, state this explicitly.
+    - Prefer accuracy and clarity over completeness.
 
-    Given the following CI job logs, perform a failure analysis with the goal of minimizing investigation time for the on-call engineer.
+    Metadata:
+    - Workflow: {workflow_name}
+    - Job: {job_name}
+    - Run URL: https://github.com/{repository}/actions/runs/{run_id}
+    Tasks:
 
-    Your tasks:
+    1. Identify the earliest failure:
+    - Quote the exact log line(s) that indicate the failure.
+    - If only generic messages are present (e.g., "Process completed with exit code 1"), state that no actionable root error is visible.
 
-    1. Identify the earliest real failure in the logs.
-    - Ignore secondary or cascading errors that occur after the initial failure.
-    - If multiple errors appear, select the one that first caused the job to fail.
+    2. Localize where the failure occurred:
+    - Workflow name
+    - Job name
+    - Step name (or action name)
+    - `run:` command or action being executed
+    - File path, line number, container, or Kubernetes pod (if present)
+    - If localization is incomplete, explicitly state why.
 
-    2. Precisely locate where the failure occurred.
-    - Include:
-        - CI job name or step (if inferable)
-        - Command or script being executed
-        - File path, line number, container, or pod name (if present)
-    - If location is ambiguous, explain why.
+    3. Classify the failure into exactly ONE category:
+    infra | dependency | auth | config | test | timeout
 
-    3. Categorize the failure into exactly one of the following:
-    - infra
-    - dependency
-    - auth
-    - config
-   - test
-   - timeout
+    4. Assign a confidence level:
+    - High: clear root error and precise location
+    - Medium: strong signal but missing some context
+    - Low: generic failure or insufficient logs
 
-    4. Summarize the likely root cause in 1–2 concise sentences.
-    - Focus on the underlying issue, not the symptom.
+    5. Summarize the likely root cause in 1–2 sentences.
+    - If confidence is Low, describe the most probable failure class without guessing specifics.
 
-    5. Provide 2–4 concrete next verification or remediation steps.
-    - Steps must be actionable (specific commands, config checks, or logs to inspect).
-    - Prioritize steps that confirm or rule out the root cause quickly.
+    6. Provide 2–4 fast verification or remediation steps:
+    - Steps must be concrete and immediately actionable.
+    - Prefer validation commands or checks over permanent fixes.
+    - Avoid generic advice.
 
-    6. Format the final output exactly as a Slack-ready incident notification.
-
-    Slack message format:
-
+    Output format (Slack-ready, exact):
     ---
-    🚨 *CI Pipeline Failure Detected*
+    🚨 *Pipeline Failure Detected*
 
     *Failure Category:* <category>
+    *Confidence:* <High | Medium | Low>
 
     *Earliest Failure:*
-    <short error message>
+    <quoted error or explicit statement that no actionable error is present>
 
     *Location:*
-    - Job/Step: <job or step name>
-    - Command: <command if available>
-    - File/Path/Pod: <file path, container, or pod name if available>
+    - Workflow: {workflow_name}
+    - Job: {job_name}
+    - Step: {step_name}
+    - Command / Action: {run_command}
+    - File / Path / Container / Pod: {file_path}
 
-    *Likely Root Cause:*
+    *Root Cause Assessment:*
     <concise explanation>
 
     *Recommended Next Steps:*
-    1. <step one>
-    2. <step two>
-    3. <step three (if applicable)>
+    1. <step>
+    2. <step>
+    3. <step>
+
+    *Run URL:* https://github.com/{repository}/actions/runs/{run_id}
     ---
 
-    Logs:
-    {tail_logs}
+    Do NOT include raw logs.
+    Do NOT add commentary outside this format.
 
-    Do not include raw logs.
-    Do not speculate beyond the evidence in the logs.
-    If required information is missing, explicitly state what is missing.
     """
     response = client.chat.completions.create(
         model="gpt-5-nano",
@@ -102,6 +131,7 @@ def send_to_slack(message):
 
 
 if __name__ == "__main__":
+    metadata = get_github_metadata()
     log_file_path = sys.argv[1]
     report = investigate_logs(log_file_path)
     send_to_slack(report)
