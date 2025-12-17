@@ -10,7 +10,7 @@ jobs:
 
       - name: Run App
         run: |
-          set -e -o pipefail
+          set -o pipefail
           node app.js 2>&1 | tee output.log
 
       - name: Upload Logs on Failure
@@ -21,7 +21,7 @@ jobs:
           path: output.log
   investigate:
     needs: run-app
-    if: always() && needs.run-app.result == 'success'
+    if: always() && needs.run-app.result == 'failure'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
