@@ -14,7 +14,14 @@ def investigate_logs(log_file_path):
         return "File does not exist"
     with open(log_file_path, 'r') as file:
         logs = file.readlines()
-        tail_logs = "".join(logs[-100:])
+
+        if len(logs) > 2000:
+            head = "".join(logs[:200])
+            tail = "".join(logs[-1800:])
+            tail_logs = f"{head}\n\n... [TRUNCATED {len(logs)-2000} LINES ] ...\n\n{tail}"
+        else:
+            tail_logs = "".join(logs)
+
 
     # Metadata for GitHub Environment
     workflow_name = os.getenv("GITHUB_WORKFLOW_NAME")
@@ -48,6 +55,11 @@ def investigate_logs(log_file_path):
     - Workflow: {workflow_name}
     - Job: {job_name}
     - Run URL: https://github.com/{repository}/actions/runs/{run_id}
+
+    --- BEGINNING OF LOGS ---
+    {tail_logs}
+    --- END OF LOGS ---
+    
     Tasks:
 
     1. Identify the earliest failure:
@@ -105,11 +117,13 @@ def investigate_logs(log_file_path):
 
     """
     response = client.chat.completions.create(
-        model="gpt-5-nano",
+        model="gpt-4o",
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
-        ]
+        ],
+        temperature=0.1, #make AI a boring reporter of facts :)
+        max_tokens=800
     )
     return response.choices[0].message.content
 
