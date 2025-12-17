@@ -130,31 +130,31 @@ def send_to_slack(slack_webhook_url, message, run_url):
                 "text": "🚨 *CI/CD Failure Analysis* 🚨",
                 "emoji": True
             }, 
-            {
-                "type": "divider"
-            },
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f"{message}"
-                }
-            },
-            {
-                "type": "actions",
-                "elements": [
-                    {
-                        "type": "button",
-                        "text": {
-                            "type": "plain_text",
-                            "text": "View Failed Run"
-                            "emoji": True
-                        },
-                        "url": run_url,
-                        "style": "danger"
-                    }
-                ]
+        },
+        {
+            "type": "divider"
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"{message}"
             }
+        },
+        {
+            "type": "actions",
+            "elements": [
+                {
+                    "type": "button",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "View Failed Run"
+                        "emoji": True
+                    },
+                    "url": run_url,
+                    "style": "danger"
+                }
+            ]
         }
     ]
     payload = {"blocks": blocks}
