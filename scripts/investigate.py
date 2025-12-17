@@ -5,6 +5,9 @@ import requests
 from openai import OpenAI
 from slack_sdk import WebClient
 
+
+slack_webhook_url = os.getenv("SLACK_WEBHOOK")
+
 def investigate_logs(log_file_path):
     # READ LOGS FROM FILE
     if not os.path.exists(log_file_path):
@@ -114,16 +117,51 @@ def investigate_logs(log_file_path):
     )
     return response.choices[0].message.content
 
-def send_to_slack(message):
+def send_to_slack(slack_webhook_url, message, run_url):
     # Send Report to Slack
-    slack_webhook_url = os.getenv("SLACK_WEBHOOK")
     if not slack_webhook_url:
         raise ValueError("SLACK_WEBHOOK environment variable is not set")
-    payload = {
-        "text": f"🚨 *CI/CD Failure Analysis* 🚨\n{message}"
-    }
-    requests.post(slack_webhook_url, json=payload)
 
+    blocks = [
+        {
+            "type": "header",
+            "text": {
+                "type": "plain_text",
+                "text": "🚨 *CI/CD Failure Analysis* 🚨",
+                "emoji": True
+            }, 
+            {
+                "type": "divider"
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"{message}"
+                }
+            },
+            {
+                "type": "actions",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "View Failed Run"
+                            "emoji": True
+                        },
+                        "url": run_url,
+                        "style": "danger"
+                    }
+                ]
+            }
+        }
+    ]
+    payload = {"blocks": blocks}
+    response = requests.post(slack_webhook_url, json=payload)
+    if response.status_code != 200:
+        raise Exception("Failed to send Slack notification")
+    print("Slack notification sent successfully")
 
 if __name__ == "__main__":
     log_file_path = sys.argv[1]
