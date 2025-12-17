@@ -21,7 +21,7 @@ jobs:
           path: output.log
   investigate:
     needs: run-app
-    if: always() && needs.run-app.result == 'failure'
+    if: always() && needs.run-app.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
