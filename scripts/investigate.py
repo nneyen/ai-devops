@@ -45,9 +45,9 @@ def investigate_logs(log_file_path):
     - Prefer accuracy and clarity over completeness.
 
     Metadata:
-    - Workflow: {workflow_name}
-    - Job: {job_name}
-    - Run URL: https://github.com/{repository}/actions/runs/{run_id}
+    - Workflow: {metadata["workflow_name"]}
+    - Job: {metadata["job_name"]}
+    - Run URL: https://github.com/{metadata["repository"]}/actions/runs/{metadata["run_id"]}
     Tasks:
 
     1. Identify the earliest failure:
