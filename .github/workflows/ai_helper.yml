@@ -26,5 +26,5 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
         run: |
-          gh run view ${{ github.run_id }} --log-failed > failure.log
+          gh job view ${{ github.job_id }} --log > failure.log
           python scripts/investigate.py failure.log
