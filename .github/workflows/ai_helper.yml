@@ -41,4 +41,4 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-        run: python scripts/investigate.py failure.log
+        run: python scripts/investigate.py output.log
