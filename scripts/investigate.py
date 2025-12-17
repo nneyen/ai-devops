@@ -166,5 +166,13 @@ def send_to_slack(slack_webhook_url, message, run_url):
 if __name__ == "__main__":
     log_file_path = sys.argv[1]
     report = investigate_logs(log_file_path)
-    send_to_slack(report)
+
+    webhook_url = os.getenv("SLACK_WEBHOOK")
+    repo = os.getenv("GITHUB_REPOSITORY", "Unknown/Repo")
+    run_id = os.getenv("GITHUB_RUN_ID", "0")
+    
+    # Construct the Run URL for the Slack button
+    run_url = f"https://github.com/{repo}/actions/runs/{run_id}"
+    
+    send_to_slack(webhook_url, report, run_url)
     print("Analysis completed. Report sent to Slack.")
