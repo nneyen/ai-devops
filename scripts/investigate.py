@@ -1,4 +1,7 @@
-import os sys json requests 
+import os 
+import sys 
+import json 
+import requests 
 from openai import OpenAI
 from slack_sdk import WebClient
 
