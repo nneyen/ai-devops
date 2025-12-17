@@ -24,10 +24,10 @@ def investigate_logs(log_file_path):
 
 
     # Metadata for GitHub Environment
-    workflow_name = os.getenv("GITHUB_WORKFLOW_NAME")
-    job_name = os.getenv("GITHUB_JOB_NAME")
-    repository = os.getenv("GITHUB_REPOSITORY")
-    run_id = os.getenv("GITHUB_RUN_ID")
+    workflow_name = os.getenv("GITHUB_WORKFLOW_NAME", "Unknown Workflow")
+    job_name = os.getenv("TARGET_JOB_NAME", "Unknown Job")
+    repository = os.getenv("GITHUB_REPOSITORY", "Unknown Repository")
+    run_id = os.getenv("GITHUB_RUN_ID", "Unknown Run ID")
     
     # ASK AI TO INVESTIGATE
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -131,15 +131,25 @@ def send_to_slack(slack_webhook_url, message, run_url):
     # Send Report to Slack
     if not slack_webhook_url:
         raise ValueError("SLACK_WEBHOOK environment variable is not set")
+    clean_message = message.replace("---", "").strip()
+    repository = os.getenv("GITHUB_REPOSITORY", "Unknown Repository")
+    actor = os.getenv("GITHUB_ACTOR", "Unknown Actor")
 
     blocks = [
         {
             "type": "header",
             "text": {
                 "type": "plain_text",
-                "text": "🚨 *CI/CD Failure Analysis* 🚨",
+                "text": "🚨 *Pipeline Failure Analysis* 🚨",
                 "emoji": True
             }, 
+        },
+        {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": f"*Run triggered by:* @{actor}"
+            }
         },
         {
             "type": "divider"
@@ -148,9 +158,18 @@ def send_to_slack(slack_webhook_url, message, run_url):
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"{message}"
+                "text": f"{clean_message}"
             }
         },
+        {
+            "type": "context",
+            "elements": [
+                {
+                    "type": "mrkdwn",
+                    "text": f"📍 *Repo:* {repository}  |  🆔 *Run ID:* {os.getenv('GITHUB_RUN_ID')}"
+                }
+            ]
+        }
         {
             "type": "actions",
             "elements": [
