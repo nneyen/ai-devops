@@ -86,10 +86,9 @@ def investigate_logs(log_file_path):
     <quoted error or explicit statement that no actionable error is present>
 
     *Location:*
+    - Repository: {repository}
     - Workflow: {workflow_name}
     - Job: {job_name}
-    - Step: {step_name}
-    - Command / Action: {run_command}
 
     *Root Cause Assessment:*
     <concise explanation>
