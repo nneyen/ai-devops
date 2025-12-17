@@ -80,8 +80,6 @@ def investigate_logs(log_file_path):
 
     Output format (Slack-ready, exact):
     ---
-    🚨 *Pipeline Failure Detected*
-
     *Failure Category:* <category>
     *Confidence:* <High | Medium | Low>
 
@@ -100,8 +98,6 @@ def investigate_logs(log_file_path):
     1. <step>
     2. <step>
     3. <step>
-
-    *Run URL:* https://github.com/{repository}/actions/runs/{run_id}
     ---
 
     Do NOT include raw logs.
@@ -173,6 +169,6 @@ if __name__ == "__main__":
     
     # Construct the Run URL for the Slack button
     run_url = f"https://github.com/{repo}/actions/runs/{run_id}"
-    
+
     send_to_slack(webhook_url, report, run_url)
     print("Analysis completed. Report sent to Slack.")
