@@ -112,7 +112,6 @@ def investigate_logs(log_file_path):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ]
-        temperature=0.1
     )
     return response.choices[0].message.content
 
