@@ -1,4 +1,7 @@
 // app.js
+// script is designed to automatically fail in CI/CD pipeline
+
+
 console.log("Starting application...");
 
 const dbUrl = process.env.DATABASE_URL;
