@@ -5,11 +5,19 @@ import requests
 from openai import OpenAI
 from slack_sdk import WebClient
 
-
+# Metadata for GitHub Environment
+workflow_name = os.getenv("GITHUB_WORKFLOW_NAME", "Unknown Workflow")
+job_name = os.getenv("TARGET_JOB_NAME", "Unknown Job")
+repository = os.getenv("GITHUB_REPOSITORY", "Unknown Repository")
+run_id = os.getenv("GITHUB_RUN_ID", "Unknown Run ID")
 slack_webhook_url = os.getenv("SLACK_WEBHOOK")
+actor = os.getenv("GITHUB_ACTOR", "Unknown Actor")
 
+
+# Function to Investigate Logs
 def investigate_logs(log_file_path):
-    # READ LOGS FROM FILE
+    
+    # READ AND TRUNCATE LOGS
     if not os.path.exists(log_file_path):
         return "File does not exist"
     with open(log_file_path, 'r') as file:
@@ -22,19 +30,15 @@ def investigate_logs(log_file_path):
         else:
             tail_logs = "".join(logs)
 
-
-    # Metadata for GitHub Environment
-    workflow_name = os.getenv("GITHUB_WORKFLOW_NAME")
-    job_name = os.getenv("GITHUB_JOB_NAME")
-    repository = os.getenv("GITHUB_REPOSITORY")
-    run_id = os.getenv("GITHUB_RUN_ID")
-    
-    # ASK AI TO INVESTIGATE
+    # CONFIGURE AI CLIENT
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+    # CONFIGURE AI SYSTEM PROMPT
     system_prompt = """
     You are a senior DevOps engineer performing automated CI/CD failure triage for GitHub Actions workflows.
     You will be given GitHub Actions job logs (possibly truncated) and workflow metadata.
     Your objective is to minimize investigation time for the on-call engineer.
+    Output ONLY A VALID JSON OBJECT.
     
     Strict rules:
     - Identify the earliest *actionable* failure in execution order.
@@ -43,18 +47,10 @@ def investigate_logs(log_file_path):
     - If the logs do not contain a concrete root error, state this explicitly.
     - Prefer accuracy and clarity over completeness.
     """
-    user_prompt = f"""
-    Strict rules:
-    - Identify the earliest *actionable* failure in execution order.
-    - Ignore secondary, cascading, or cleanup errors.
-    - Do NOT speculate beyond what is present in the logs.
-    - If the logs do not contain a concrete root error, state this explicitly.
-    - Prefer accuracy and clarity over completeness.
 
-    Metadata:
-    - Workflow: {workflow_name}
-    - Job: {job_name}
-    - Run URL: https://github.com/{repository}/actions/runs/{run_id}
+    # CONFIGURE AI USER PROMPT
+    user_prompt = f"""
+    Analyse these logs for Repo: {repository}, Workflow: {workflow_name}, Job: {job_name}, Run URL: https://github.com/{repository}/actions/runs/{run_id}
 
     --- BEGINNING OF LOGS ---
     {tail_logs}
@@ -90,89 +86,123 @@ def investigate_logs(log_file_path):
     - Prefer validation commands or checks over permanent fixes.
     - Avoid generic advice.
 
-    Output format (Slack-ready, exact):
-    ---
-    *Failure Category:* <category>
-    *Confidence:* <High | Medium | Low>
-
-    *Earliest Failure:*
-    <quoted error or explicit statement that no actionable error is present>
-
-    *Location:*
-    - Repository: {repository}
-    - Workflow: {workflow_name}
-    - Job: {job_name}
-
-    *Root Cause Assessment:*
-    <concise explanation>
-
-    *Recommended Next Steps:*
-    1. <step>
-    2. <step>
-    3. <step>
-    ---
-
+    OUTPUT FORMAT (JSON ONLY):
+    {{
+        "category": "infra | dependency | auth | config | test | timeout",
+        "confidence": "High | Medium | Low",
+        "earliest_failure": "Exact error line from logs",
+        "root_cause": "1-2 sentence explanation",
+        "remediation": ["step 1", "step 2", "step 3", "step 4"]
+    }}
+    
     Do NOT include raw logs.
     Do NOT add commentary outside this format.
-
     """
+
+    # ASK AI TO INVESTIGATE
     response = client.chat.completions.create(
         model="gpt-4o",
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ],
-        temperature=0.1, #make AI a boring reporter of facts :)
+        response_format={"type": "json_object"},
+        temperature=0.1,
         max_tokens=800
     )
-    return response.choices[0].message.content
+    return json.loads(response.choices[0].message.content)  
 
+# Function to Send Report to Slack
 def send_to_slack(slack_webhook_url, message, run_url):
     # Send Report to Slack
     if not slack_webhook_url:
         raise ValueError("SLACK_WEBHOOK environment variable is not set")
+    
+    # Format the message for Slack
+    category_icons = {
+        "infra": "☁️", "dependency": "📦", "auth": "🔐", 
+        "config": "⚙️", "test": "🧪", "timeout": "⏳"
+    }
 
-    blocks = [
-        {
-            "type": "header",
-            "text": {
-                "type": "plain_text",
-                "text": "🚨 *CI/CD Failure Analysis* 🚨",
-                "emoji": True
-            }, 
-        },
-        {
-            "type": "divider"
-        },
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f"{message}"
-            }
-        },
-        {
-            "type": "actions",
-            "elements": [
-                {
-                    "type": "button",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "View Failed Run",
-                        "emoji": True
-                    },
-                    "url": run_url,
-                    "style": "danger"
+    confidence_icons = {
+        "high": "✅", "medium": "⚠️", "low": "❓"
+    }
+    category = message.get("category", "config").lower()
+    confidence = message.get("confidence", "low").lower()
+    
+    category_icon = category_icons.get(category, "❓")
+    confidence_icon = confidence_icons.get(confidence, "❓")
+    
+    payload = {
+        "blocks": [
+            {
+                "type": "header",
+                "text": {
+                    "type": "plain_text",
+                    "text": "🔴 Pipeline Failure Analysis  🔴",
+                    "emoji": True
                 }
-            ]
-        }
-    ]
-    payload = {"blocks": blocks}
-    response = requests.post(slack_webhook_url, json=payload)
-    if response.status_code != 200:
-        raise Exception("Failed to send Slack notification")
-    print("Slack notification sent successfully")
+            },
+            {
+                "type": "section",
+                "fields": [
+                    {"type": "mrkdwn", "text": f"*Category:*\n{category_icon} `{category.upper()}`"},
+                    {"type": "mrkdwn", "text": f"*Confidence:*\n{confidence_icon} `{confidence.upper()}`"}
+                ]
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"*Earliest Failure:*\n```{message.get('earliest_failure')}```"
+                }
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"*Root Cause Assessment:*\n```{message.get('root_cause')}```"
+                }
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*Remediation Steps:*\n" + "```" + "\n".join([f"{i+1}. {step}" for i, step in enumerate(report.get("remediation", []))]) + "```"
+                }
+            },
+            {
+                "type": "divider"
+            },
+            {
+                "type": "context",
+                "elements": [
+                    {
+                        "type": "mrkdwn",
+                        "text": f"📍 *Repo:* {repository}  |  🆔 *Run ID:* {os.getenv('GITHUB_RUN_ID')} | 👤 *Actor:* {os.getenv('GITHUB_ACTOR')}"
+                    }
+                ]
+            },
+            {
+                "type": "actions",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "View Failed Run",
+                            "emoji": True
+                        },
+                        "url": run_url,
+                        "style": "danger"
+                    }
+                ]
+            }
+        ]
+    }
 
+    requests.post(slack_webhook_url, json=payload)
+# END OF SCRIPT  
 if __name__ == "__main__":
     log_file_path = sys.argv[1]
     report = investigate_logs(log_file_path)
