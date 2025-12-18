@@ -101,13 +101,13 @@ def investigate_logs(log_file_path):
 
     # ASK AI TO INVESTIGATE
     try:
-        response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        response_format={
+            response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            response_format={
             "type": "json_object",
             "json_schema": {
                 "type": "object",
@@ -123,8 +123,8 @@ def investigate_logs(log_file_path):
         },
         temperature=0.1, #make AI a boring reporter of facts :)
         max_tokens=800
-    )
-    return json.loads(response.choices[0].message.content)
+        )
+        return json.loads(response.choices[0].message.content)
     except Exception as e:
         return {"error": f"AI Analysis failed: {str(e)}"}
 
