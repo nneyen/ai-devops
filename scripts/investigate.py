@@ -106,20 +106,7 @@ def investigate_logs(log_file_path):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ],
-        response_format={
-            "type": "json_object",
-            "json_schema": {
-                "type": "object",
-                "properties": {
-                    "category": {"type": "string"},
-                    "confidence": {"type": "string"},
-                    "earliest_failure": {"type": "string"},
-                    "root_cause": {"type": "string"},
-                    "next_steps": {"type": "array", "items": {"type": "string"}}
-                },
-                "required": ["category", "confidence", "earliest_failure", "root_cause", "next_steps"]
-            }
-        },
+        response_format={"type": "json_object"},
         temperature=0.1,
         max_tokens=800
     )
