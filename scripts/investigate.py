@@ -92,7 +92,7 @@ def investigate_logs(log_file_path):
         "confidence": "High | Medium | Low",
         "earliest_failure": "Exact error line from logs",
         "root_cause": "1-2 sentence explanation",
-        "next_steps": ["step 1", "step 2", "step 3", "step 4"]
+        "remediation": ["step 1", "step 2", "step 3", "step 4"]
     }}
     
     Do NOT include raw logs.
