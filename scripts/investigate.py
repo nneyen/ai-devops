@@ -160,7 +160,7 @@ def send_to_slack(slack_webhook_url, message, run_url):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*Remediation Steps:*\n" + "\n".join([f"{i+1}. {step}" for i, step in enumerate(message.get("remediation", []))])
+                    "text": "*Remediation Steps:*\n" + "```" + "\n".join([f"{i+1}. {step}" for i, step in enumerate(report.get("remediation", []))]) + "```"
                 }
             },
             {
