@@ -135,10 +135,6 @@ def send_to_slack(slack_webhook_url, message, run_url):
     if not slack_webhook_url:
         raise ValueError("SLACK_WEBHOOK environment variable is not set")
     
-    if "error" in message:
-        requests.post(slack_webhook_url, json={"text": f"❌ Investigator Error: {message['error']}"})
-        return
-    
     # Format the message for Slack
     icons = {
         "infra": "☁️", "dependency": "📦", "auth": "🔐", 
