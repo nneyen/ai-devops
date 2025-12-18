@@ -101,29 +101,29 @@ def investigate_logs(log_file_path):
 
     # ASK AI TO INVESTIGATE
     response = client.chat.completions.create(
-    model="gpt-4o",
-    messages=[
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt}
-    ],
-    response_format={
-    "type": "json_object",
-    "json_schema": {
-        "type": "object",
-        "properties": {
-            "category": {"type": "string"},
-            "confidence": {"type": "string"},
-            "earliest_failure": {"type": "string"},
-            "root_cause": {"type": "string"},
-            "remediation": {"type": "array", "items": {"type": "string"}}
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        response_format={
+            "type": "json_object",
+            "json_schema": {
+                "type": "object",
+                "properties": {
+                    "category": {"type": "string"},
+                    "confidence": {"type": "string"},
+                    "earliest_failure": {"type": "string"},
+                    "root_cause": {"type": "string"},
+                    "next_steps": {"type": "array", "items": {"type": "string"}}
+                },
+                "required": ["category", "confidence", "earliest_failure", "root_cause", "next_steps"]
+            }
         },
-        "required": ["category", "confidence", "earliest_failure", "root_cause", "remediation"]
-    }
-    },
-    temperature=0.1, #make AI a boring reporter of facts :)
-    max_tokens=800
+        temperature=0.1,
+        max_tokens=800
     )
-    return json.loads(response.choices[0].message.content)
+    return json.loads(response.choices[0].message.content)  
 
 # Function to Send Report to Slack
 def send_to_slack(slack_webhook_url, message, run_url):
