@@ -100,34 +100,30 @@ def investigate_logs(log_file_path):
     """
 
     # ASK AI TO INVESTIGATE
-    try:
-        response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        response_format={
-        "type": "json_object",
-        "json_schema": {
-            "type": "object",
-            "properties": {
-                "category": {"type": "string"},
-                "confidence": {"type": "string"},
-                "earliest_failure": {"type": "string"},
-                "root_cause": {"type": "string"},
-                "remediation": {"type": "array", "items": {"type": "string"}}
-            },
-            "required": ["category", "confidence", "earliest_failure", "root_cause", "remediation"]
-        }
+    response = client.chat.completions.create(
+    model="gpt-4o",
+    messages=[
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt}
+    ],
+    response_format={
+    "type": "json_object",
+    "json_schema": {
+        "type": "object",
+        "properties": {
+            "category": {"type": "string"},
+            "confidence": {"type": "string"},
+            "earliest_failure": {"type": "string"},
+            "root_cause": {"type": "string"},
+            "remediation": {"type": "array", "items": {"type": "string"}}
         },
-        temperature=0.1, #make AI a boring reporter of facts :)
-        max_tokens=800
-        )
-        return json.loads(response.choices[0].message.content)
-    except Exception as e:
-        return {"error": f"AI Analysis failed: {str(e)}"}
-
+        "required": ["category", "confidence", "earliest_failure", "root_cause", "remediation"]
+    }
+    },
+    temperature=0.1, #make AI a boring reporter of facts :)
+    max_tokens=800
+    )
+    return json.loads(response.choices[0].message.content)
 
 # Function to Send Report to Slack
 def send_to_slack(slack_webhook_url, message, run_url):
@@ -154,8 +150,8 @@ def send_to_slack(slack_webhook_url, message, run_url):
             {
                 "type": "section",
                 "fields": [
-                    {"type": "mrkdwn", "text": f"*Category:*\n{icon} `{message.get('category')}`"},
-                    {"type": "mrkdwn", "text": f"*Confidence:*\n`{message.get('confidence')}`"}
+                    {"type": "mrkdwn", "text": f"*Category:*\n{icon}`{message.get('category')}`"},
+                    {"type": "mrkdwn", "text": f"*Confidence:*\n`{icon}`{message.get('confidence')}`"}
                 ]
             },
             {
