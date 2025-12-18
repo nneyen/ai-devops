@@ -123,22 +123,23 @@ def send_to_slack(slack_webhook_url, message, run_url):
         "infra": "☁️", "dependency": "📦", "auth": "🔐", 
         "config": "⚙️", "test": "🧪", "timeout": "⏳"
     }
-    icon = icons.get(message.get("category", "").lower(), "❓")
+    category = message.get("category", "config").lower()
+    icon = icons.get(category, "❓")
     payload = {
         "blocks": [
             {
                 "type": "header",
                 "text": {
                     "type": "plain_text",
-                    "text": f"🔴*Pipeline Failure Analysis* 🔴",
+                    "text": "🔴 Pipeline Failure Analysis  🔴",
                     "emoji": True
                 }
             },
             {
                 "type": "section",
                 "fields": [
-                    {"type": "mrkdwn", "text": f"*Category:*\n{icon}`{message.get('category')}`"},
-                    {"type": "mrkdwn", "text": f"*Confidence:*\n`{icon}`{message.get('confidence')}`"}
+                    {"type": "mrkdwn", "text": f"*Category:*\n{icon} `{category}`"},
+                    {"type": "mrkdwn", "text": f"*Confidence:*\n{icon} `{message.get('confidence')}`"}
                 ]
             },
             {
@@ -192,11 +193,8 @@ def send_to_slack(slack_webhook_url, message, run_url):
         ]
     }
 
-    response = requests.post(slack_webhook_url, json=payload)
-    if response.status_code != 200:
-        raise Exception("Failed to send Slack notification")
-    print("Slack notification sent successfully")
-
+    requests.post(slack_webhook_url, json=payload)
+# END OF SCRIPT  
 if __name__ == "__main__":
     log_file_path = sys.argv[1]
     report = investigate_logs(log_file_path)
