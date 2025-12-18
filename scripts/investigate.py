@@ -119,12 +119,20 @@ def send_to_slack(slack_webhook_url, message, run_url):
         raise ValueError("SLACK_WEBHOOK environment variable is not set")
     
     # Format the message for Slack
-    icons = {
+    category_icons = {
         "infra": "☁️", "dependency": "📦", "auth": "🔐", 
         "config": "⚙️", "test": "🧪", "timeout": "⏳"
     }
+
+    confidence_icons = {
+        "high": "✅", "medium": "⚠️", "low": "❓"
+    }
     category = message.get("category", "config").lower()
-    icon = icons.get(category, "❓")
+    confidence = message.get("confidence", "low").lower()
+    
+    category_icon = category_icons.get(category, "❓")
+    confidence_icon = confidence_icons.get(confidence, "❓")
+    
     payload = {
         "blocks": [
             {
@@ -138,8 +146,8 @@ def send_to_slack(slack_webhook_url, message, run_url):
             {
                 "type": "section",
                 "fields": [
-                    {"type": "mrkdwn", "text": f"*Category:*\n{icon} `{category}`"},
-                    {"type": "mrkdwn", "text": f"*Confidence:*\n{icon} `{message.get('confidence')}`"}
+                    {"type": "mrkdwn", "text": f"*Category:*\n{category_icon} `{category.upper()}`"},
+                    {"type": "mrkdwn", "text": f"*Confidence:*\n{confidence_icon} `{confidence.upper()}`"}
                 ]
             },
             {
